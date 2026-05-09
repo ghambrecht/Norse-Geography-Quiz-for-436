@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Norse Archaeology — Geography Quiz</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f1eb;--surface:#fff;--border:#ccc8be;--text:#18160f;--muted:#6b6358;
+  --city:#b83224;--river:#1a5f82;--region:#5a4070;--sea:#9a6800;
+  --correct:#2a6048;--wrong:#8a3020;
+  --fh:'Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+  --fb:Georgia,'Times New Roman',serif;
+  --fu:system-ui,-apple-system,sans-serif;
+}
+
+/* iframe-safe layout: no height:100% on html/body */
+body{font-family:var(--fb);background:var(--bg);color:var(--text);margin:0;padding:0}
+
+header{padding:9px 14px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header h1{font-family:var(--fh);font-size:16px;font-weight:normal;letter-spacing:.02em}
+.hdr-sub{font-size:11px;color:var(--muted);font-family:var(--fu)}
+.legend{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.leg{display:flex;align-items:center;gap:4px;font-family:var(--fu);font-size:11px;color:var(--muted)}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.leg-portage{width:18px;height:0;border-top:2.5px dashed #b03060;flex-shrink:0}
+
+/* Main body: side-by-side, fixed viewport height minus header */
+.main{display:flex;width:100%;}
+#map{height:580px;width:calc(100% - 330px);float:left;background:#e8e4dc;}
+.right-col{width:330px;float:right;height:580px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);overflow:hidden;}
+
+/* Map fills left side */
+
+
+/* Quiz section — fixed, no scroll */
+.quiz-panel{padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.score-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.score-big{font-family:var(--fh);font-size:19px}
+.score-lbl{font-family:var(--fu);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.prog-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:9px}
+.prog-fill{height:100%;background:var(--correct);border-radius:2px;transition:width .4s;width:0}
+.q-lbl{font-family:var(--fu);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:3px}
+.q-badge{display:inline-block;font-family:var(--fu);font-size:10px;padding:1px 6px;border-radius:8px;margin-left:5px;font-weight:500}
+.bc{background:#fdecea;color:var(--city)}
+.br{background:#e5f0f6;color:var(--river)}
+.bg2{background:#edeaf4;color:var(--region)}
+.bs{background:#fdf4e2;color:var(--sea)}
+.q-text{font-family:var(--fh);font-size:13px;line-height:1.45;min-height:34px;margin-bottom:9px}
+.q-idle{font-style:italic;color:var(--muted);font-size:12px;font-family:var(--fu)}
+.ans-row{display:flex;gap:5px;margin-bottom:5px}
+#ans{flex:1;padding:6px 8px;font-family:var(--fb);font-size:13px;border:1px solid var(--border);border-radius:3px;background:var(--bg);color:var(--text);outline:none}
+#ans:focus{border-color:#777}
+#chk{padding:6px 11px;font-family:var(--fu);font-size:12px;border:1px solid var(--border);border-radius:3px;background:var(--text);color:var(--surface);cursor:pointer;white-space:nowrap}
+#chk:disabled{opacity:.3;cursor:default}
+#fb{font-family:var(--fu);font-size:11.5px;min-height:15px;margin-bottom:4px;line-height:1.35}
+.fbc{color:var(--correct)}.fbw{color:var(--wrong)}
+#hint-btn{font-family:var(--fu);font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;text-align:left;max-width:100%;line-height:1.4}
+
+/* Reference key — scrollable, fills remaining height */
+.key-panel{flex:1;overflow-y:auto;min-height:0}
+.key-header{
+  padding:6px 14px;background:var(--bg);border-bottom:1px solid var(--border);
+  font-family:var(--fu);font-size:10px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);position:sticky;top:0;z-index:5
+}
+.key-body{padding:6px 14px 14px}
+.key-section{margin-bottom:8px}
+.key-sec-hdr{
+  display:flex;align-items:center;gap:6px;margin-bottom:4px;padding-top:4px;
+  font-family:var(--fu);font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;
+  color:var(--muted);border-top:1px solid var(--border)
+}
+.key-section:first-child .key-sec-hdr{border-top:none;padding-top:0}
+.key-sec-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.key-row{
+  display:flex;align-items:center;gap:5px;padding:2px 3px;
+  cursor:pointer;border-radius:3px;transition:background .1s
+}
+.key-row:hover{background:var(--bg)}
+.key-num{
+  width:8px;height:8px;border-radius:50%;
+  flex-shrink:0;margin:0 2px
+}
+.key-name{font-family:var(--fb);font-size:11.5px;color:var(--text);flex:1;line-height:1.4}
+.key-tick{font-size:11px;flex-shrink:0;width:12px;text-align:center}
+.key-row.aok .key-name{color:var(--correct)}
+.key-row.aok .key-tick{color:var(--correct)}
+.key-row.awk .key-name{color:var(--wrong);text-decoration:line-through}
+.key-row.awk .key-tick{color:var(--wrong)}
+
+/* Result overlay */
+#result{
+  display:none;position:fixed;inset:0;background:rgba(244,241,235,.95);
+  z-index:2000;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:2rem
+}
+#result.show{display:flex}
+#result h2{font-family:var(--fh);font-size:24px;font-weight:normal;margin-bottom:6px}
+.res-score{font-family:var(--fh);font-size:46px;color:var(--correct);margin:10px 0;line-height:1}
+.res-msg{font-family:var(--fu);font-size:13px;color:var(--muted);max-width:320px;line-height:1.6;margin-bottom:18px}
+#restart{padding:9px 24px;font-family:var(--fu);font-size:13px;border:1px solid var(--border);border-radius:3px;background:var(--text);color:var(--surface);cursor:pointer}
+
+/* Leaflet marker */
+.qm{
+  width:22px;height:22px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.85);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fu);font-size:9px;font-weight:700;color:#fff;
+  cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .1s
+}
+.qm:hover{transform:scale(1.18)}
+.qm.sel{transform:scale(1.2);outline:2px solid #18160f;outline-offset:1px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Norse Archaeology — Geography Quiz</h1>
+  <span class="hdr-sub">Click a numbered marker on the map · type the name · press Enter</span>
+  <div class="legend">
+    <div class="leg"><span class="leg-dot" style="background:var(--city)"></span>Cities</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--river)"></span>Rivers</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--region)"></span>Regions</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--sea)"></span>Seas/lakes</div>
+    <div class="leg"><span class="leg-portage"></span>Portage</div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="map"></div>
+
+  <div class="right-col">
+
+    <!-- QUIZ PANEL -->
+    <div class="quiz-panel">
+      <div class="score-row">
+        <div><div class="score-lbl">Score</div><div class="score-big"><span id="sc">0</span> / <span id="st">0</span></div></div>
+        <div style="text-align:right"><div class="score-lbl">Remaining</div><div class="score-big" style="font-size:14px" id="sl">52</div></div>
+      </div>
+      <div class="prog-track"><div class="prog-fill" id="prog"></div></div>
+      <div class="q-lbl" id="qlbl">Select a marker</div>
+      <div class="q-text q-idle" id="qtext">Click any numbered marker on the map to begin.</div>
+      <div class="ans-row">
+        <input id="ans" type="text" placeholder="Type answer here…" disabled autocomplete="off" autocorrect="off" spellcheck="false"/>
+        <button id="chk" disabled>Check</button>
+      </div>
+      <div id="fb"></div>
+      <button id="hint-btn" style="display:none">Show hint</button>
+    </div>
+
+    <!-- PERMANENT REFERENCE KEY -->
+    <div class="key-panel">
+      <div class="key-header">Location reference — all 52 locations to identify</div>
+      <div class="key-body" id="key-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="result">
+  <h2>Quiz complete</h2>
+  <div class="res-score" id="res-score"></div>
+  <div class="res-msg" id="res-msg"></div>
+  <button id="restart">Restart</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ================================================================
+   DATA
+   ================================================================ */
+const CITIES = [
+  {id:1,  label:"London",         alts:["londinium","lundenwic"],        lat:51.505, lng:-.090,  hint:"Roman Londinium; major Thames port, raided and occupied by Norse forces in the 9th century"},
+  {id:2,  label:"York",           alts:["jorvik","eoforwic"],            lat:53.958, lng:-1.082, hint:"Norse Jorvik; Viking capital of northern England from 866"},
+  {id:3,  label:"Dublin",         alts:["dyflin","dyflinn"],             lat:53.333, lng:-6.249, hint:"Norse Dyflin; longphort founded c. 841, major Norse urban centre"},
+  {id:4,  label:"Hamburg",        alts:["hammaburg"],                    lat:53.550, lng:9.993,  hint:"Key Carolingian port on the Elbe; repeatedly sacked by Norse in the 9th century"},
+  {id:5,  label:"Bergen",         alts:["bjorgvin","bjørgvin"],          lat:60.391, lng:5.322,  hint:"Norway's great western port and gateway to the North Atlantic routes"},
+  {id:6,  label:"Paris",          alts:["lutetia"],                      lat:48.857, lng:2.352,  hint:"Besieged by Norse fleets in 845 and during the great siege of 885–886"},
+  {id:7,  label:"Córdoba",        alts:["cordoba","qurtuba"],            lat:37.888, lng:-4.779, hint:"Capital of the Umayyad Caliphate; Norse raiders reached Iberia in 844"},
+  {id:8,  label:"Rome",           alts:["roma"],                         lat:41.897, lng:12.483, hint:"Seat of the papacy; Norman descendants of Norse settled southern Italy and Sicily"},
+  {id:9,  label:"Constantinople", alts:["miklagardr","miklagard","byzantium","istanbul"], lat:41.015, lng:28.978, hint:"Norse Miklagarðr; the Varangian Guard served the Byzantine emperor here"},
+  {id:10, label:"Baghdad",        alts:["madinat al-salam"],             lat:33.341, lng:44.401, hint:"Abbasid capital; Norse-Rus traders brought furs and silver here via the Volga route"},
+  {id:11, label:"Kyiv",           alts:["kiev","koenugard","kænugardr"], lat:50.450, lng:30.523, hint:"Capital of Kievan Rus' on the Dnieper; hub of the southern trade route to Byzantium"},
+  {id:12, label:"Milan",          alts:["mediolanum","milano"],          lat:45.464, lng:9.190,  hint:"Major Lombard city; trade and pilgrimage routes connected it to the Norse world"},
+];
+const RIVERS = [
+  {id:13, label:"Thames",          alts:["tamesis"],                      lat:51.490, lng:.050,   hint:"London's river; Norse fleets sailed up it to raid and control the city"},
+  {id:14, label:"Severn",          alts:["sabrina"],                      lat:51.800, lng:-2.580, hint:"Britain's longest river, draining Wales and the English Midlands"},
+  {id:15, label:"Shannon",         alts:[],                               lat:52.680, lng:-8.620, hint:"Ireland's longest river; Vikings established longphorts along its banks"},
+  {id:16, label:"Liffey",          alts:["ruirthech"],                    lat:53.345, lng:-6.280, hint:"Dublin's river; the Norse longphort that became Dublin sat at its mouth"},
+  {id:17, label:"Seine",           alts:[],                               lat:49.200, lng:1.200,  hint:"Norse fleets rowed up this river to besiege Paris in 845 and 885"},
+  {id:18, label:"Loire",           alts:[],                               lat:47.400, lng:.800,   hint:"Major French Atlantic river; Norse raids reached Nantes and far inland"},
+  {id:19, label:"Garonne",         alts:[],                               lat:44.600, lng:-.300,  hint:"Southwest French river; Norse raids reached Bordeaux via the Bay of Biscay"},
+  {id:20, label:"Rhône",           alts:["rhone"],                        lat:44.800, lng:4.700,  hint:"Flows south through Lyon to the Mediterranean; major Frankish trade artery"},
+  {id:21, label:"Rhine",           alts:["rhein","rhin"],                 lat:51.800, lng:6.200,  hint:"Boundary of Frankish power; Viking raids reached Cologne and far inland"},
+  {id:22, label:"Elbe",            alts:["albi","labe"],                  lat:53.400, lng:10.200, hint:"Linked Hamburg to Central Europe; Norse forces sacked Hamburg from the Elbe in 845"},
+  {id:23, label:"Oder",            alts:["odra"],                         lat:52.800, lng:14.600, hint:"Border river between Germany and Poland; drains to the Baltic"},
+  {id:24, label:"Vistula",         alts:["wisla","weichsel"],             lat:52.230, lng:21.010, hint:"Poland's principal river draining to the Baltic; eastern corridor for trade"},
+  {id:25, label:"Dvina (Daugava)", alts:["dvina","daugava","duna","western dvina"], lat:56.700, lng:25.500, hint:"Flows into the Gulf of Riga; Norse entry-point to the Varangian eastern route"},
+  {id:26, label:"Dnieper",         alts:["dnipro","dnepr","borysthenes"], lat:49.600, lng:33.500, hint:"The 'road of the Varangians to the Greeks' — main Norse route from the Baltic to the Black Sea"},
+  {id:27, label:"Volga",           alts:["itil","etil","ra"],             lat:56.000, lng:47.000, hint:"Europe's longest river; the eastern Varangian route to the Caspian and Islamic world"},
+  {id:28, label:"Danube",          alts:["donau","dunaj","dunarea"],      lat:47.800, lng:17.000, hint:"Southern Europe's great river; Byzantine frontier and boundary of Frankish power"},
+];
+const REGIONS = [
+  {id:29, label:"Vinland (Newfoundland)", alts:["vinland","newfoundland","vineland"], lat:51.600, lng:-55.500, hint:"Norse name for North America; L'Anse aux Meadows is the only confirmed Norse site, c. 1000 CE"},
+  {id:30, label:"Greenland",       alts:["gronland","groenland"],         lat:72.000, lng:-40.000, hint:"Settled by Erik the Red c. 985 CE; two Norse colonies persisted for roughly 500 years"},
+  {id:31, label:"Iceland",         alts:["island"],                       lat:65.000, lng:-18.500, hint:"Settled c. 870 CE; source of the sagas; site of the Althing, oldest continuous parliament"},
+  {id:32, label:"Faroe Islands",   alts:["faroes","faeroe islands","faeroes"], lat:62.000, lng:-6.800, hint:"Norse 'sheep islands'; stepping stone between Norway and Iceland"},
+  {id:33, label:"Outer Hebrides",  alts:["western isles","hebrides"],     lat:57.800, lng:-7.100, hint:"Scottish island chain; heavily settled by Norse from the 9th century"},
+  {id:34, label:"Orkney",          alts:["orkney islands","orkneyjar"],   lat:59.000, lng:-3.000, hint:"Norse earldom from the 9th century; major staging post for raids on Britain and Ireland"},
+  {id:35, label:"Shetland",        alts:["hjaltland","shetland islands"], lat:60.500, lng:-1.200, hint:"Norse Hjaltland; Britain's northernmost islands, closest to Norway"},
+  {id:36, label:"Lofoten Islands", alts:["lofoten"],                      lat:68.200, lng:14.500, hint:"Dramatic Norwegian archipelago; major fishing base and chieftain seat in the Viking Age"},
+  {id:37, label:"Trøndelag",       alts:["trondelag","trondheim region"], lat:63.800, lng:11.500, hint:"Central Norwegian region; seat of the Lade earls and site of Nidaros (Trondheim)"},
+  {id:38, label:"Denmark",         alts:["danmark"],                      lat:56.000, lng:10.000, hint:"Core Norse kingdom; launching point for raids across western Europe"},
+  {id:39, label:"England",         alts:["angleland","englaland"],        lat:52.500, lng:-1.500, hint:"Target of Norse raids from 793; the Danelaw established by 878"},
+  {id:40, label:"Ireland",         alts:["eire","hibernia"],              lat:53.200, lng:-8.000, hint:"Site of major Norse longphorts; Hiberno-Norse culture developed here"},
+  {id:41, label:"Scotland",        alts:["alba","caledonia"],             lat:57.000, lng:-4.000, hint:"Norse settled the northern and western coasts; Orkney and Shetland under Norse rule until 1468–69"},
+  {id:42, label:"Normandy",        alts:["normandie"],                    lat:49.200, lng:.500,   hint:"Granted to Norse leader Rollo c. 911; 'Land of the Northmen'; launching pad for the 1066 conquest"},
+];
+const SEAS = [
+  {id:43, label:"North Atlantic",    alts:["atlantic","north atlantic ocean"], lat:50.000, lng:-30.000, hint:"The ocean crossed by Norse to reach Iceland, Greenland, and North America"},
+  {id:44, label:"North Sea",         alts:["german ocean","german sea"],   lat:56.500, lng:3.500,   hint:"Core Viking sailing ground between Scandinavia, Britain, and the Continent"},
+  {id:45, label:"Baltic Sea",        alts:["east sea","austmarr"],         lat:58.000, lng:19.500,  hint:"Norse Austmarr ('eastern lake'); the Varangian highway to Russia"},
+  {id:46, label:"English Channel",   alts:["la manche","channel"],         lat:50.200, lng:-1.500,  hint:"Narrow strait between England and France; heavily used by Norse fleets"},
+  {id:47, label:"Bay of Biscay",     alts:["golfe de gascogne","biscay"],  lat:45.000, lng:-5.000,  hint:"Open bay; Norse rounded it raiding toward Iberia and the Mediterranean"},
+  {id:48, label:"Strait of Gibraltar",alts:["straits of gibraltar","straights of gibraltar","pillars of hercules"], lat:35.970, lng:-5.600, hint:"Entrance to the Mediterranean; Norse fleets passed through here in 859–861"},
+  {id:49, label:"Mediterranean Sea", alts:["mediterranean","mare nostrum"],lat:37.000, lng:14.000,  hint:"Norse reached here as raiders and as Varangian mercenaries serving Byzantium"},
+  {id:50, label:"Lake Mälaren",      alts:["malaren","lake malaren"],      lat:59.500, lng:17.200,  hint:"Swedish lake near Birka; heart of Svea Norse political power"},
+  {id:51, label:"Black Sea",         alts:["euxine","pontus euxinus"],     lat:43.000, lng:33.000,  hint:"Southern endpoint of the Dnieper route; Norse traders passed through here"},
+  {id:52, label:"Caspian Sea",       alts:["caspian","khazar sea"],        lat:41.500, lng:51.500,  hint:"End of the Volga route; Norse-Rus traded furs and silver with the Islamic world here"},
+];
+
+const ALL=[
+  ...CITIES.map(l=>({...l,type:"city"})),
+  ...RIVERS.map(l=>({...l,type:"river"})),
+  ...REGIONS.map(l=>({...l,type:"region"})),
+  ...SEAS.map(l=>({...l,type:"sea"})),
+];
+
+const TC={city:"#b83224",river:"#1a5f82",region:"#5a4070",sea:"#9a6800"};
+const TL={city:"City / settlement",river:"River",region:"Land region",sea:"Sea / lake / strait"};
+const TB={city:"bc",river:"br",region:"bg2",sea:"bs"};
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let S={cur:null,answered:{},correct:0,total:0,hints:new Set(),markers:{}};
+
+/* ================================================================
+   MAP — CartoDB light (no referrer blocks)
+   ================================================================ */
+const map=L.map('map',{center:[54,20],zoom:3,minZoom:2,maxZoom:10});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains:'abcd',maxZoom:19
+}).addTo(map);
+
+/* Canvas iframe fix: invalidate repeatedly, no viewport math needed */
+function fixMap(){ map.invalidateSize(true); }
+setTimeout(fixMap,100);
+setTimeout(fixMap,500);
+setTimeout(fixMap,1000);
+setTimeout(fixMap,2000);
+setTimeout(fixMap,4000);
+window.addEventListener('load',function(){fixMap();setTimeout(fixMap,300);setTimeout(fixMap,800);});
+window.addEventListener('resize',fixMap);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(fixMap,200);});
+
+/* ================================================================
+   RIVERS
+   ================================================================ */
+function R(pts,w,o){L.polyline(pts,{color:"#2a6a9a",weight:w,opacity:o||.65}).addTo(map);}
+
+R([[51.69,-1.99],[51.62,-1.60],[51.54,-1.20],[51.505,-.09],[51.51,.40]],2.2);
+R([[52.54,-3.88],[52.20,-3.40],[51.85,-2.58],[51.56,-2.64]],2);
+R([[54.10,-8.05],[53.72,-8.00],[53.17,-7.96],[52.68,-8.62],[52.40,-9.00],[52.62,-9.49]],2);
+R([[53.13,-6.55],[53.22,-6.45],[53.33,-6.38],[53.345,-6.28]],1.5);
+R([[47.45,4.79],[47.80,3.90],[48.20,3.00],[48.50,2.40],[48.86,2.35],[49.20,1.20],[49.43,-.18]],2.2);
+R([[44.77,3.97],[45.30,3.50],[46.00,3.80],[47.00,2.50],[47.40,.80],[47.27,-.44]],2);
+R([[42.72,.55],[43.30,.80],[44.00,.30],[44.60,-.30],[45.10,-1.10]],1.8);
+R([[46.45,6.55],[46.00,5.90],[45.70,5.00],[44.80,4.70],[43.67,4.63]],1.8);
+R([[46.85,9.30],[47.60,7.60],[48.50,7.70],[49.50,8.40],[50.95,6.96],[51.49,5.99],[51.96,6.10],[52.10,6.90],[51.98,4.50]],2.5);
+R([[50.65,13.90],[51.30,12.40],[52.40,11.70],[53.10,11.90],[53.40,10.20],[53.55,9.98]],2);
+R([[50.25,17.90],[51.00,16.20],[52.00,14.80],[52.80,14.60],[53.60,14.30],[53.87,14.24]],1.8);
+R([[49.70,19.00],[50.06,19.93],[50.60,19.80],[51.40,21.10],[52.23,21.01],[52.90,19.70],[54.20,18.70],[54.37,18.64]],2);
+R([[48.08,8.14],[48.10,10.70],[48.00,13.00],[48.20,16.40],[47.80,17.00],[47.40,19.10],[46.10,18.90],[45.10,20.30],[44.80,20.50],[44.00,22.70],[43.70,25.90],[45.20,28.70],[45.50,29.70]],2.8);
+R([[48.20,24.70],[46.40,28.00],[45.50,29.70]],1.2,.45);
+/* Eastern network */
+R([[60.00,32.50],[59.94,30.30]],2);                      /* Neva */
+R([[58.00,31.00],[58.52,31.27],[59.00,31.60],[59.94,32.30]],2.2); /* Volkhov */
+R([[56.00,31.30],[57.00,31.20],[57.60,31.10],[58.00,31.00]],1.8); /* Lovat */
+R([[54.78,32.05],[55.30,31.80],[55.80,31.50],[56.00,31.30]],1.8); /* Upper Dnieper N */
+R([[54.78,32.05],[53.90,32.10],[52.45,31.50],[50.45,30.52],[49.60,33.50],[48.00,35.10],[46.75,32.70],[46.48,32.29]],2.5); /* Dnieper S */
+R([[54.50,28.20],[53.90,29.50],[53.15,30.00],[52.45,31.50]],1.5,.55); /* Berezina */
+R([[55.80,31.50],[56.00,30.00],[56.20,28.00],[56.50,26.50],[56.95,24.10],[57.04,23.60]],1.9); /* Dvina */
+R([[57.25,33.00],[57.50,33.50],[57.90,36.50],[57.50,39.00],[57.00,41.00],[56.33,43.99],[55.80,48.00],[53.20,49.60],[52.00,45.70],[50.20,46.00],[48.20,46.20],[46.30,48.10],[45.70,47.80]],3); /* Volga */
+R([[54.83,37.61],[55.10,38.50],[55.50,40.30],[56.20,42.00],[56.33,43.99]],1.6,.55); /* Oka */
+R([[58.00,56.30],[57.50,53.50],[56.50,51.00],[56.00,49.50],[55.50,48.40],[56.33,43.99]],1.8,.55); /* Kama */
+R([[54.00,38.40],[53.00,38.50],[51.70,39.20],[50.00,41.00],[48.50,43.00],[47.50,42.20],[47.20,39.70],[47.10,37.80]],2); /* Don */
+R([[50.30,44.20],[50.00,43.60],[49.50,43.00],[48.50,43.00]],1.3,.5); /* Ilovlya */
+
+/* ================================================================
+   PORTAGE ROUTES
+   ================================================================ */
+const PS={color:"#b03060",weight:2.5,opacity:.75,dashArray:"6,5"};
+function portage(pts,tip){
+  L.polyline(pts,PS).addTo(map)
+   .bindTooltip(tip,{sticky:true,className:'ptip'});
+}
+const pStyle=document.createElement('style');
+pStyle.textContent='.ptip{font-family:Georgia,serif;font-size:11px;background:#fff;border:1px solid #ccc8be;color:#333;padding:4px 8px;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,.15)}';
+document.head.appendChild(pStyle);
+
+portage([[58.00,31.00],[57.60,31.10]],"Lovat–Volkhov portage<br><small>Key step on the Baltic → Dnieper route</small>");
+portage([[56.00,31.30],[55.80,31.50]],"Lovat–Dnieper portage (Smolensk watershed)<br><small>~10–15 km overland carry</small>");
+portage([[55.80,31.50],[57.25,33.00]],"Dnieper–Volga portage (Valdai Hills)<br><small>The fork: south to Byzantium or east to the Caspian</small>");
+portage([[55.80,31.50],[56.00,30.00]],"Dvina–Dnieper portage<br><small>Western Dvina headwaters meet upper Dnieper</small>");
+portage([[49.00,44.50],[49.00,42.00]],"Volga–Don portage (Ilovlya)<br><small>~70 km carry; documented by Arab geographers</small>");
+portage([[48.30,9.00],[48.00,10.50]],"Rhine–Danube portage (Swabian Alb)<br><small>North Sea basin to Danube / Black Sea basin</small>");
+
+/* ================================================================
+   MARKERS
+   ================================================================ */
+function makeIcon(loc){
+  const done=S.answered[loc.id]!==undefined;
+  const ok=S.answered[loc.id]===true;
+  let bg=TC[loc.type];
+  if(done) bg=ok?'#2a6048':'#8a3020';
+  const sel=!done&&S.cur===loc.id;
+  return L.divIcon({
+    className:'',
+    html:`<div class="qm${sel?' sel':''}" style="background:${bg}">${loc.id}</div>`,
+    iconSize:[22,22],iconAnchor:[11,11]
+  });
+}
+ALL.forEach(loc=>{
+  const m=L.marker([loc.lat,loc.lng],{icon:makeIcon(loc),zIndexOffset:500}).addTo(map);
+  m.on('click',()=>selectLoc(loc.id));
+  S.markers[loc.id]=m;
+});
+function refreshMarkers(){ALL.forEach(l=>S.markers[l.id].setIcon(makeIcon(l)));}
+
+/* ================================================================
+   REFERENCE KEY — build permanently visible list
+   ================================================================ */
+(function buildKey(){
+  const kb=document.getElementById('key-body');
+  const secs=[
+    {label:'Cities',         color:TC.city,   items:CITIES},
+    {label:'Rivers',         color:TC.river,  items:RIVERS},
+    {label:'Regions',        color:TC.region, items:REGIONS},
+    {label:'Seas & lakes',   color:TC.sea,    items:SEAS},
+  ];
+  secs.forEach(sec=>{
+    const sec_div=document.createElement('div');
+    sec_div.className='key-section';
+    sec_div.innerHTML=`<div class="key-sec-hdr"><span class="key-sec-dot" style="background:${sec.color}"></span>${sec.label}</div>`;
+    sec.items.forEach(loc=>{
+      const row=document.createElement('div');
+      row.className='key-row';
+      row.id='kr-'+loc.id;
+      row.innerHTML=`
+        <span class="key-num" style="background:${sec.color}"></span>
+        <span class="key-name">${loc.label}</span>
+        <span class="key-tick" id="kt-${loc.id}"></span>`;
+      row.addEventListener('click',()=>{
+        map.setView([loc.lat,loc.lng],5,{animate:true});
+        selectLoc(loc.id);
+      });
+      sec_div.appendChild(row);
+    });
+    kb.appendChild(sec_div);
+  });
+})();
+
+function updateKeyRow(id){
+  const row=document.getElementById('kr-'+id);
+  const tick=document.getElementById('kt-'+id);
+  if(!row||!tick) return;
+  const ok=S.answered[id]===true;
+  row.classList.remove('aok','awk');
+  row.classList.add(ok?'aok':'awk');
+  tick.textContent=ok?'✓':'✗';
+}
+
+/* ================================================================
+   QUIZ LOGIC
+   ================================================================ */
+function selectLoc(id){
+  const loc=ALL.find(l=>l.id===id);
+  if(!loc) return;
+  const done=S.answered[id]!==undefined;
+
+  document.getElementById('qlbl').innerHTML=`Marker #${id} &mdash; ${TL[loc.type]}`;
+  document.getElementById('qtext').className='q-text';
+  document.getElementById('qtext').innerHTML=`What is the name of this location?<span class="q-badge ${TB[loc.type]}">${TL[loc.type]}</span>`;
+
+  const fb=document.getElementById('fb');
+  const ans=document.getElementById('ans');
+  const hb=document.getElementById('hint-btn');
+
+  if(done){
+    const ok=S.answered[id];
+    fb.textContent=ok?`✓ Correct: ${loc.label}`:`Answer: ${loc.label}`;
+    fb.className=ok?'fbc':'fbw';
+    ans.disabled=true; ans.value='';
+    document.getElementById('chk').disabled=true;
+    hb.style.display='none';
+    /* scroll key row into view */
+    document.getElementById('kr-'+id)?.scrollIntoView({block:'nearest'});
+    return;
+  }
+  S.cur=id;
+  fb.textContent=''; fb.className='';
+  ans.disabled=false; ans.value=''; ans.focus();
+  document.getElementById('chk').disabled=false;
+  hb.style.display=S.hints.has(id)?'none':'inline';
+  hb.textContent='Show hint'; hb.disabled=false;
+  document.getElementById('kr-'+id)?.scrollIntoView({block:'nearest'});
+  refreshMarkers();
+}
+
+function normalize(s){
+  return s.toLowerCase()
+    .replace(/[áàâäã]/g,'a').replace(/[éèêë]/g,'e').replace(/[íìîï]/g,'i')
+    .replace(/[óòôöőõ]/g,'o').replace(/[úùûü]/g,'u')
+    .replace(/ð/g,'d').replace(/þ/g,'th').replace(/ø/g,'o').replace(/æ/g,'ae')
+    .replace(/[āēīōū]/g,c=>({ā:'a',ē:'e',ī:'i',ō:'o',ū:'u'}[c]))
+    .replace(/[łśńčšž]/g,c=>({ł:'l',ś:'s',ń:'n',č:'c',š:'s',ž:'z'}[c]))
+    .replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function checkAnswer(){
+  const id=S.cur;
+  if(!id||S.answered[id]!==undefined) return;
+  const loc=ALL.find(l=>l.id===id);
+  const user=normalize(document.getElementById('ans').value);
+  if(!user) return;
+
+  const targets=[normalize(loc.label),...loc.alts.map(normalize)];
+  const hit=targets.some(t=>{
+    const tc=t.replace(/\(.*?\)/g,'').trim();
+    const uc=user.replace(/\(.*?\)/g,'').trim();
+    return t===user||tc===uc||tc.startsWith(uc)||uc.startsWith(tc);
+  });
+
+  S.answered[id]=hit;
+  S.total++;
+  if(hit) S.correct++;
+
+  const fb=document.getElementById('fb');
+  fb.textContent=hit?`✓ Correct! ${loc.label}`:`✗ Answer: ${loc.label}`;
+  fb.className=hit?'fbc':'fbw';
+  document.getElementById('ans').disabled=true;
+  document.getElementById('chk').disabled=true;
+  document.getElementById('hint-btn').style.display='none';
+
+  updateScores();
+  updateKeyRow(id);
+  refreshMarkers();
+  if(Object.keys(S.answered).length===ALL.length) setTimeout(showResult,1200);
+}
+
+function updateScores(){
+  const done=Object.keys(S.answered).length;
+  document.getElementById('sc').textContent=S.correct;
+  document.getElementById('st').textContent=S.total;
+  document.getElementById('sl').textContent=ALL.length-done;
+  document.getElementById('prog').style.width=(done/ALL.length*100)+'%';
+}
+
+function showResult(){
+  const pct=Math.round(S.correct/ALL.length*100);
+  document.getElementById('res-score').textContent=`${S.correct} / ${ALL.length}`;
+  const msgs=[
+    [90,`${pct}% — exceptional command of Norse world geography.`],
+    [75,`${pct}% — strong work. Review the island groups and eastern rivers.`],
+    [55,`${pct}% — solid foundation. Focus on the Varangian river routes.`],
+    [0, `${pct}% — keep studying. This world stretches from Vinland to Baghdad.`],
+  ];
+  document.getElementById('res-msg').textContent=msgs.find(m=>pct>=m[0])[1];
+  document.getElementById('result').classList.add('show');
+}
+
+document.getElementById('chk').addEventListener('click',checkAnswer);
+document.getElementById('ans').addEventListener('keydown',e=>{if(e.key==='Enter')checkAnswer();});
+document.getElementById('hint-btn').addEventListener('click',()=>{
+  const loc=ALL.find(l=>l.id===S.cur);
+  if(!loc) return;
+  S.hints.add(loc.id);
+  document.getElementById('hint-btn').textContent=loc.hint;
+  document.getElementById('hint-btn').disabled=true;
+});
+
+document.getElementById('restart').addEventListener('click',()=>{
+  S={cur:null,answered:{},correct:0,total:0,hints:new Set(),markers:S.markers};
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('qlbl').textContent='Select a marker';
+  document.getElementById('qtext').textContent='Click any numbered marker on the map to begin.';
+  document.getElementById('qtext').className='q-text q-idle';
+  document.getElementById('fb').textContent='';
+  document.getElementById('ans').disabled=true;
+  document.getElementById('chk').disabled=true;
+  document.getElementById('hint-btn').style.display='none';
+  document.querySelectorAll('.key-row').forEach(r=>r.classList.remove('aok','awk'));
+  document.querySelectorAll('.key-tick').forEach(t=>t.textContent='');
+  updateScores();
+  refreshMarkers();
+});
+
+updateScores();
+</script>
+</body>
+</html>
