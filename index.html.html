@@ -15,8 +15,7 @@
   --fb:Georgia,'Times New Roman',serif;
   --fu:system-ui,-apple-system,sans-serif;
 }
-html,body{height:100%;overflow:hidden;margin:0;padding:0}
-body{font-family:var(--fb);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+body{font-family:var(--fb);background:var(--bg);color:var(--text);margin:0;padding:0;}
 
 /* HEADER */
 header{
@@ -31,13 +30,8 @@ header h1{font-family:var(--fh);font-size:16px;font-weight:normal;letter-spacing
 .leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .leg-portage{width:18px;height:0;border-top:2.5px dashed #b03060;flex-shrink:0}
 
-/* MAIN: fills remaining height */
-.main{flex:1;display:flex;min-height:0;overflow:hidden;}
-
-/* MAP */
-#map{flex:1;min-width:0;min-height:0;}
-
-/* RIGHT PANEL */
+.main{display:flex;width:100%;}
+#map{flex:1;min-width:0;}
 .right-col{
   width:330px;flex-shrink:0;
   display:flex;flex-direction:column;
@@ -71,7 +65,7 @@ header h1{font-family:var(--fh);font-size:16px;font-weight:normal;letter-spacing
 #hint-btn{font-family:var(--fu);font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;text-align:left;max-width:100%;line-height:1.4}
 
 /* REFERENCE KEY — scrollable, fills remaining panel height */
-.key-panel{flex:1;overflow-y:auto;min-height:0;}
+.key-panel{overflow-y:auto;}
 .key-header{
   padding:6px 14px;background:var(--bg);border-bottom:1px solid var(--border);
   font-family:var(--fu);font-size:10px;text-transform:uppercase;
@@ -266,11 +260,23 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png
   subdomains:'abcd',maxZoom:19
 }).addTo(map);
 
-/* Single clean invalidateSize after load — no iframe hacks needed for GitHub Pages */
-window.addEventListener('load',function(){
-  setTimeout(function(){map.invalidateSize();},200);
-});
-window.addEventListener('resize',function(){map.invalidateSize();});
+/* Set all heights explicitly in JS — works everywhere */
+function setHeights(){
+  var winH = window.innerHeight;
+  var headerH = document.querySelector('header').offsetHeight;
+  var bodyH = winH - headerH;
+  document.querySelector('.main').style.height = bodyH + 'px';
+  document.getElementById('map').style.height = bodyH + 'px';
+  document.querySelector('.right-col').style.height = bodyH + 'px';
+  var qpH = document.querySelector('.quiz-panel').offsetHeight;
+  var khH = document.querySelector('.key-header').offsetHeight;
+  document.querySelector('.key-panel').style.height = (bodyH - qpH - khH) + 'px';
+  map.invalidateSize(true);
+}
+window.addEventListener('load', function(){ setHeights(); setTimeout(setHeights, 300); });
+window.addEventListener('resize', setHeights);
+setTimeout(setHeights, 100);
+setTimeout(setHeights, 500);
 
 /* ================================================================
    RIVERS
